@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 PORT = int(os.getenv("PORT", "10000"))
 # Render-এ ডিপ্লয় করার পর আপনার অ্যাপের URL এখানে বসাতে হবে (যেমন: https://my-bot.onrender.com)
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").strip()
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://group-security-bot-fu3g.onrender.com").strip()
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
