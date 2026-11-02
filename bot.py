@@ -1,21 +1,12 @@
 import os
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-
-# --- Configuration ---
-BOT_TOKEN = os.getenv("BOT_TOKEN", "9078431355:AAE4tT5EENSXrU3gG9_ZrIk8i20lxFjnEwE")
-
-# Logging Setup
-import os
-import logging
 import asyncio
 from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # --- Configuration ---
-BOT_TOKEN = os.getenv("BOT_TOKEN", "9078431355:AAE4tT5EENSXrU3gG9_ZrIk8i20lxFjnEwE")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 PORT = int(os.getenv("PORT", "10000"))
 # Render-এ ডিপ্লয় করার পর আপনার অ্যাপের URL এখানে বসাতে হবে (যেমন: https://my-bot.onrender.com)
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://group-security-bot-xtkp.onrender.com") 
@@ -118,7 +109,7 @@ async def health_check(request: web.Request) -> web.Response:
     return web.Response(text="Bot is running!")
 
 async def main():
-    if not BOT_TOKEN or BOT_TOKEN == "9078431355:AAE4tT5EENSXrU3gG9_ZrIk8i20lxFjnEwE":
+    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
         raise RuntimeError("BOT_TOKEN is missing. Set it in Render Environment Variables.")
     if not WEBHOOK_URL:
         raise RuntimeError("WEBHOOK_URL is missing. Set it in Render Environment Variables (e.g., https://your-app.onrender.com).")
