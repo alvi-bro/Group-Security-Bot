@@ -5,14 +5,14 @@ from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
+# --- Configuration ---
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 PORT = int(os.getenv("PORT", "10000"))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").strip()
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- মেনু লেআউট ---
+# --- Main Menu Layout ---
 def get_main_menu():
     row1 = [InlineKeyboardButton("👥 Group Add", callback_data="group_add"), InlineKeyboardButton("🛡️ Mod Commands", callback_data="mod_commands")]
     row2 = [InlineKeyboardButton("👋 Welcome Set", callback_data="welcome_set"), InlineKeyboardButton("📜 Rules Set", callback_data="rules_set")]
@@ -27,7 +27,7 @@ def get_main_menu():
     row11 = [InlineKeyboardButton("🤖 Our Bot", callback_data="our_bot"), InlineKeyboardButton("📚 Helpline", callback_data="helpline")]
     return InlineKeyboardMarkup([row1, row2, row3, row4, row5, row6, row7, row8, row9, row10, row11])
 
-# --- হ্যান্ডলার ---
+# --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = f"✨ **𝐖𝐄𝐋𝐂𝐎𝐌𝐄, {update.effective_user.first_name}** ✨\n\n👑 **𝐏𝐫𝐞𝐦𝐢𝐮𝐦 𝐆𝐫𝐨𝐮𝐩 𝐂𝐨𝐧𝐭𝐫𝐨𝐥𝐥𝐞𝐫**\n👇 নিচের মেনু থেকে সিলেক্ট করুন:"
     await update.message.reply_text(text=text, reply_markup=get_main_menu(), parse_mode="Markdown")
@@ -43,54 +43,49 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         back = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="main_menu")]])
         await query.edit_message_text(text=text, reply_markup=back, parse_mode="Markdown")
 
-# --- ওয়েব সার্ভার ও ওয়েবহুক লজিক ---
-async def telegram_webhook(request):
-    app = request.app['tg_app']
-    try:
-        data = await request.json()
-        update = Update.de_json(data, app.bot)
-        await app.update_queue.put(update)
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-    return web.Response(text="OK")
-
+# --- Dummy Web Server for Render Health Check ---
 async def health_check(request):
-    return web.Response(text="Bot is alive!")
+    return web.Response(text="Bot is running with Polling!")
 
+async def run_dummy_server():
+    app = web.Application()
+    app.router.add_get("/", health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    logger.info(f"Dummy web server started on port {PORT}")
+
+# --- Main Runner ---
 async def main():
     if not BOT_TOKEN:
         raise RuntimeError("BOT_TOKEN is missing in Environment Variables.")
-    if not WEBHOOK_URL:
-        raise RuntimeError("WEBHOOK_URL is missing. Set it to your Render URL (e.g., https://my-app.onrender.com)")
 
-    # ১. টেলিগ্রাম অ্যাপ্লিকেশন তৈরি
-    tg_app = Application.builder().token(BOT_TOKEN).build()
-    tg_app.add_handler(CommandHandler("start", start))
-    tg_app.add_handler(CallbackQueryHandler(button_handler))
+    # ১. Render-এর পোর্ট চেক পাস করার জন্য ছোট ওয়েব সার্ভার চালু
+    await run_dummy_server()
 
-    # ২. ওয়েব সার্ভার তৈরি
-    webapp = web.Application()
-    webapp['tg_app'] = tg_app
-    webapp.router.add_get("/", health_check)
-    webapp.router.add_post("/webhook", telegram_webhook)
+    # ২. টেলিগ্রাম অ্যাপ্লিকেশন তৈরি
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
 
-    # ৩. ওয়েব সার্ভার চালু (Render-এর জন্য 0.0.0.0 এবং PORT জরুরি)
-    runner = web.AppRunner(webapp)
-    await runner.setup()
-    await web.TCPSite(runner, "0.0.0.0", PORT).start()
-    logger.info(f"Web server listening on port {PORT}")
+    # ৩. বট চালু (Polling Mode)
+    logger.info("Starting bot in Polling mode...")
+    
+    # Webhook ডিলিট করে পোলিং শুরু করা (নিশ্চিত করার জন্য)
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    
+    # Polling শুরু
+    await app.initialize()
+    await app.updater.start_polling()
+    await app.start()
 
-    # ৪. টেলিগ্রাম বট ইনিশিয়ালাইজ ও ওয়েবহুক সেট
-    await tg_app.initialize()
-    await tg_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook", drop_pending_updates=True)
-    await tg_app.start()
-    logger.info("Telegram Bot started via Webhook")
-
+    # ৪. প্রোগ্রাম চলমান রাখা
     try:
         await asyncio.Event().wait()
     finally:
-        await tg_app.stop()
-        await runner.cleanup()
+        await app.updater.stop()
+        await app.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
