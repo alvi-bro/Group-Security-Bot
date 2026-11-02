@@ -1,22 +1,18 @@
 import os
 import logging
-import asyncio
-from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # --- Configuration ---
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-PORT = int(os.getenv("PORT", "10000"))
-# Render-এ ডিপ্লয় করার পর আপনার অ্যাপের URL এখানে বসাতে হবে (যেমন: https://my-bot.onrender.com)
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://group-security-bot-xtkp.onrender.com") 
 
+# Logging Setup
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# --- Main Menu Layout ---
+# --- Main Menu Layout (Exactly like the Image) ---
 def get_main_menu():
     row1 = [InlineKeyboardButton("👥 Group Add", callback_data="group_add"), InlineKeyboardButton("🛡️ Mod Commands", callback_data="mod_commands")]
     row2 = [InlineKeyboardButton("👋 Welcome Set", callback_data="welcome_set"), InlineKeyboardButton("📜 Rules Set", callback_data="rules_set")]
@@ -92,59 +88,20 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await query.edit_message_text(text=text, reply_markup=get_main_menu(), parse_mode="Markdown")
 
-# --- Webhook & Web Server Logic ---
-async def webhook_handler(request: web.Request) -> web.Response:
-    """Processes updates from Telegram."""
-    application = request.app['telegram_app']
-    try:
-        data = await request.json()
-        update = Update.de_json(data, application.bot)
-        await application.update_queue.put(update)
-    except Exception as e:
-        logger.error(f"Error processing update: {e}")
-    return web.Response(text="OK")
-
-async def health_check(request: web.Request) -> web.Response:
-    """Render health check endpoint."""
-    return web.Response(text="Bot is running!")
-
-async def main():
-    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-        raise RuntimeError("BOT_TOKEN is missing. Set it in Render Environment Variables.")
-    if not WEBHOOK_URL:
-        raise RuntimeError("WEBHOOK_URL is missing. Set it in Render Environment Variables (e.g., https://your-app.onrender.com).")
-
-    # Initialize Telegram Application
+def main():
+    # Create the Application and pass it your bot's token.
     application = Application.builder().token(BOT_TOKEN).build()
+
+    # Command handlers
     application.add_handler(CommandHandler("start", start))
+
+    # Callback query handlers
     application.add_handler(CallbackQueryHandler(back_to_menu, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Initialize Web Server
-    webapp = web.Application()
-    webapp['telegram_app'] = application
-    webapp.router.add_get("/", health_check)
-    webapp.router.add_post("/webhook", webhook_handler)
-
-    # Start Web Server
-    runner = web.AppRunner(webapp)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-    logger.info(f"Web server listening on port {PORT}")
-
-    # Start Telegram Bot with Webhook
-    await application.initialize()
-    await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-    await application.start()
-    logger.info("Telegram Bot started via Webhook")
-
-    # Keep the script running
-    try:
-        await asyncio.Event().wait()
-    finally:
-        await application.stop()
-        await runner.cleanup()
+    # Run the bot
+    logger.info("Bot is starting...")
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
