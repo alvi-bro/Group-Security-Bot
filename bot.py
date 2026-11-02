@@ -7,13 +7,12 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 PORT = int(os.getenv("PORT", "10000"))
-# Render-এ ডিপ্লয় করার পর আপনার অ্যাপের URL এখানে বসাতে হবে (যেমন: https://my-bot.onrender.com)
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://group-security-bot-fu3g.onrender.com").strip()
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").strip()
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- মেনু লেআউট (আগের মতোই) ---
+# --- মেনু লেআউট ---
 def get_main_menu():
     row1 = [InlineKeyboardButton("👥 Group Add", callback_data="group_add"), InlineKeyboardButton("🛡️ Mod Commands", callback_data="mod_commands")]
     row2 = [InlineKeyboardButton("👋 Welcome Set", callback_data="welcome_set"), InlineKeyboardButton("📜 Rules Set", callback_data="rules_set")]
@@ -46,7 +45,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- ওয়েব সার্ভার ও ওয়েবহুক লজিক ---
 async def telegram_webhook(request):
-    """Telegram থেকে আসা আপডেট রিসিভ করে।"""
     app = request.app['tg_app']
     try:
         data = await request.json()
@@ -57,7 +55,6 @@ async def telegram_webhook(request):
     return web.Response(text="OK")
 
 async def health_check(request):
-    """Render-এর হেলথ চেকের জন্য।"""
     return web.Response(text="Bot is alive!")
 
 async def main():
@@ -71,13 +68,13 @@ async def main():
     tg_app.add_handler(CommandHandler("start", start))
     tg_app.add_handler(CallbackQueryHandler(button_handler))
 
-    # ২. ওয়েব সার্ভার তৈরি (Render-এর জন্য)
+    # ২. ওয়েব সার্ভার তৈরি
     webapp = web.Application()
     webapp['tg_app'] = tg_app
     webapp.router.add_get("/", health_check)
     webapp.router.add_post("/webhook", telegram_webhook)
 
-    # ৩. ওয়েব সার্ভার চালু
+    # ৩. ওয়েব সার্ভার চালু (Render-এর জন্য 0.0.0.0 এবং PORT জরুরি)
     runner = web.AppRunner(webapp)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()
@@ -89,7 +86,6 @@ async def main():
     await tg_app.start()
     logger.info("Telegram Bot started via Webhook")
 
-    # ৫. প্রোগ্রাম চলমান রাখা
     try:
         await asyncio.Event().wait()
     finally:
